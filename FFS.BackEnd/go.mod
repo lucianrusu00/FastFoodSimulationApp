@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	BusinessLogicModels v1.0.0
+	BusinessLogicUtilities v1.0.0
 	DatabaseModels v1.0.0
     Controllers v1.0.0
 	BusinessLogicServices v1.0.0
@@ -20,3 +21,5 @@ replace BusinessLogicModels v1.0.0 => ./FFS.BusinessLogic/Models
 replace DatabaseModels v1.0.0 => ./FFS.Database/Models
 
 replace BusinessLogicServices v1.0.0 => ./FFS.BusinessLogic/Services
+
+replace BusinessLogicUtilities v1.0.0 => ./FFS.BusinessLogic/Utilities
