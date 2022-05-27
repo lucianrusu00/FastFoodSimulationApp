@@ -56,7 +56,7 @@ func createPreparationMachineIngredientBuffer(preparationMachine DatabaseModels.
 
 }
 
-func createPreparationMachineFoodItemBuffer(preparationMachine DatabaseModels.PreparationMachineFoodItem, buffers map[string]([]chan DatabaseModels.FoodItem), capacityControl map[string]([]chan bool), preparationMachinesFoodItems map[string](map[string](chan DatabaseModels.FoodItem))) {
+func createPMFoodItemBuffer(preparationMachine DatabaseModels.PMFoodItem, buffers map[string]([]chan DatabaseModels.FoodItem), capacityControl map[string]([]chan bool), preparationMachinesFoodItems map[string](map[string](chan DatabaseModels.FoodItem))) {
 	preparationMachinesFoodItems[preparationMachine.Name] = make(map[string]chan DatabaseModels.FoodItem)
 	capacityControl[preparationMachine.Name] = make([]chan bool, preparationMachine.NumberOfMachines)
 	buffers[preparationMachine.Name] = make([]chan DatabaseModels.FoodItem, preparationMachine.NumberOfMachines)
@@ -75,7 +75,7 @@ func addIngredientToPrepMachine(ingredient DatabaseModels.Ingredient, channels m
 
 func addFoodItemToPrepMachine(foodItem DatabaseModels.FoodItem, channels map[string](map[string](chan DatabaseModels.FoodItem))) {
 	//channels[foodItem.PreparationMachine.Name] = make(map[string]chan FoodItem)
-	channels[foodItem.PreparationMachineFoodItem.Name][foodItem.Name] = make(chan DatabaseModels.FoodItem, foodItem.PreparationMachineFoodItem.Capacity)
+	channels[foodItem.PMFoodItem.Name][foodItem.Name] = make(chan DatabaseModels.FoodItem, foodItem.PMFoodItem.Capacity)
 }
 
 func runPreparationMachineIngredient(preparationMachine DatabaseModels.PreparationMachine, capacityControl map[string]([]chan bool), preparationMachinesBuffer map[string]([]chan DatabaseModels.Ingredient), preparationMachinesIngredients map[string](map[string](chan DatabaseModels.Ingredient)), machineNumber int, employeeList *EmployeeList) {
@@ -106,7 +106,7 @@ func runPreparationMachineIngredient(preparationMachine DatabaseModels.Preparati
 	}
 }
 
-func runPreparationMachineFoodItem(preparationMachine DatabaseModels.PreparationMachineFoodItem, capacityControl map[string]([]chan bool), preparationMachinesFoodItemsBuffer map[string]([]chan DatabaseModels.FoodItem), preparationMachinesIngredientsBuffer map[string]([]chan DatabaseModels.Ingredient), preparationMachinesIngredients map[string](map[string](chan DatabaseModels.Ingredient)), preparationMachineFoodItems map[string](map[string](chan DatabaseModels.FoodItem)), machineNumber int, employeeList *EmployeeList) {
+func runPMFoodItem(preparationMachine DatabaseModels.PMFoodItem, capacityControl map[string]([]chan bool), preparationMachinesFoodItemsBuffer map[string]([]chan DatabaseModels.FoodItem), preparationMachinesIngredientsBuffer map[string]([]chan DatabaseModels.Ingredient), preparationMachinesIngredients map[string](map[string](chan DatabaseModels.Ingredient)), preparationMachineFoodItems map[string](map[string](chan DatabaseModels.FoodItem)), machineNumber int, employeeList *EmployeeList) {
 	fmt.Printf("-- Setup --: Run %s number %d\n", preparationMachine.Name, machineNumber)
 	for {
 		fmt.Printf("-- PrepMahineFoodItem Thread --: Waiting for a food Item to prepare\n\n")
@@ -116,17 +116,17 @@ func runPreparationMachineFoodItem(preparationMachine DatabaseModels.Preparation
 		// send ingredient to it's prepMachine
 		for _, foodI := range foodItem.FoodItems {
 			fmt.Printf("-- PrepMahineFoodItem Thread --: Sending foodItem %s to one of it's prepMachines\n", foodI.Name)
-			for k := 0; k < foodI.PreparationMachineFoodItem.NumberOfMachines; k++ {
+			for k := 0; k < foodI.PMFoodItem.NumberOfMachines; k++ {
 				select {
-				case capacityControl[foodI.PreparationMachineFoodItem.Name][k] <- true:
-					preparationMachinesFoodItemsBuffer[foodI.PreparationMachineFoodItem.Name][k] <- foodI
-					// sent the ingredient to be prepared ^^^
-					fmt.Printf("-- PrepMahineFoodItem Thread --: Selected prep machine: %s, number %d for foodItem %s\n", foodI.PreparationMachineFoodItem.Name, k, foodI.Name)
-					k = foodI.PreparationMachineFoodItem.NumberOfMachines
+				case capacityControl[foodI.PMFoodItem.Name][k] <- true:
+					preparationMachinesFoodItemsBuffer[foodI.PMFoodItem.Name][k] <- foodI
+					// sent the food item to be prepared ^^^
+					fmt.Printf("-- PrepMahineFoodItem Thread --: Selected prep machine: %s, number %d for foodItem %s\n", foodI.PMFoodItem.Name, k, foodI.Name)
+					k = foodI.PMFoodItem.NumberOfMachines
 				default:
-					fmt.Printf("-- PrepMachineFoodItem Thread --: Machine %s number %d is full, going to try machine %d\n", foodI.PreparationMachineFoodItem.Name, k, k+1)
+					fmt.Printf("-- PrepMachineFoodItem Thread --: Machine %s number %d is full, going to try machine %d\n", foodI.PMFoodItem.Name, k, k+1)
 				}
-				if k == foodI.PreparationMachineFoodItem.NumberOfMachines-1 {
+				if k == foodI.PMFoodItem.NumberOfMachines-1 {
 					fmt.Printf("-- ERROR -- PrepMahineFoodItem Thread --: Empty machine not found for FoodItem %s\n", foodI.Name)
 				}
 			}
@@ -152,14 +152,15 @@ func runPreparationMachineFoodItem(preparationMachine DatabaseModels.Preparation
 		}
 
 		go func(fI DatabaseModels.FoodItem, employeeList *EmployeeList) { // wait for the ingredients to be ready
-			for _, foodI := range fI.FoodItems {
-				foodItemMade := <-preparationMachineFoodItems[foodI.PreparationMachineFoodItem.Name][foodI.Name]
-				fmt.Printf("-- PrepMahineFoodItem Thread --: FoodItem %s has been prepared and received for assembly\n", foodItemMade.Name)
-			}
 
 			for _, i := range fI.IngredientList {
 				ingredientMade := <-preparationMachinesIngredients[i.PreparationMachine.Name][i.Name]
 				fmt.Printf("-- PrepMahineFoodItem Thread --: Ingredient %s has been prepared and received for assembly\n", ingredientMade.Name)
+			}
+
+			for _, foodI := range fI.FoodItems {
+				foodItemMade := <-preparationMachineFoodItems[foodI.PMFoodItem.Name][foodI.Name]
+				fmt.Printf("-- PrepMahineFoodItem Thread --: FoodItem %s has been prepared and received for assembly\n", foodItemMade.Name)
 			}
 
 			fmt.Printf("-- PrepMahineFoodItem Thread --: Assigning employee \n")
@@ -189,18 +190,18 @@ func runOrderThread(preparationMachinesFoodItemsBuffer map[string]([]chan Databa
 		fmt.Printf("-- Order Thread --: Received order %s\n", order.Name)
 
 		for _, f := range order.FoodItems {
-			fmt.Printf("-- Order Thread --: Sending food item %s to it's prep machine %s\n", f.Name, f.PreparationMachineFoodItem.Name)
-			for k := 0; k < f.PreparationMachineFoodItem.NumberOfMachines; k++ {
-				fmt.Printf("-- Order Thread --: Trying to send food item %s to prep machine number %d---------------------------------------------------------------------------\n", f.Name, k)
+			fmt.Printf("-- Order Thread --: Sending food item %s to it's prep machine %s\n", f.Name, f.PMFoodItem.Name)
+			for k := 0; k < f.PMFoodItem.NumberOfMachines; k++ {
+				fmt.Printf("-- Order Thread --: Trying to send food item %s to prep machine number %d\n", f.Name, k)
 				select {
-				case capacityControl[f.PreparationMachineFoodItem.Name][k] <- true:
-					preparationMachinesFoodItemsBuffer[f.PreparationMachineFoodItem.Name][k] <- f
-					fmt.Printf("-- Order Thread --: Selected prep machine: %s, number %d for FoodItem %s\n", f.PreparationMachineFoodItem.Name, k, f.Name)
-					k = f.PreparationMachineFoodItem.NumberOfMachines
+				case capacityControl[f.PMFoodItem.Name][k] <- true:
+					preparationMachinesFoodItemsBuffer[f.PMFoodItem.Name][k] <- f
+					fmt.Printf("-- Order Thread --: Selected prep machine: %s, number %d for FoodItem %s\n", f.PMFoodItem.Name, k, f.Name)
+					k = f.PMFoodItem.NumberOfMachines
 				default:
-					fmt.Printf("-- Order Thread --: Machine %s number %d is full, going to try machine %d, total machine number = %d---------------------------------------------------------------------------\n", f.PreparationMachineFoodItem.Name, k, k+1, f.PreparationMachineFoodItem.NumberOfMachines)
+					fmt.Printf("-- Order Thread --: Machine %s number %d is full, going to try machine %d, total machine number = %d\n", f.PMFoodItem.Name, k, k+1, f.PMFoodItem.NumberOfMachines)
 				}
-				if k == f.PreparationMachineFoodItem.NumberOfMachines-1 {
+				if k == f.PMFoodItem.NumberOfMachines-1 {
 					fmt.Printf("-- ERROR -- Order Thread --: Empty machine not found for FoodItem %s\n", f.Name)
 				}
 			}
@@ -211,9 +212,9 @@ func runOrderThread(preparationMachinesFoodItemsBuffer map[string]([]chan Databa
 
 			// This can receive food items in any order
 			for _, f := range o.FoodItems {
-				fmt.Printf("-- Order Thread --: Waiting for food item %s to be send back to the order thread from prep machine %s\n", f.Name, f.PreparationMachineFoodItem.Name)
-				fmt.Println(preparationMachineFoodItems[f.PreparationMachineFoodItem.Name][f.Name])
-				foodItemMade := <-preparationMachineFoodItems[f.PreparationMachineFoodItem.Name][f.Name]
+				fmt.Printf("-- Order Thread --: Waiting for food item %s to be send back to the order thread from prep machine %s\n", f.Name, f.PMFoodItem.Name)
+				fmt.Println(preparationMachineFoodItems[f.PMFoodItem.Name][f.Name])
+				foodItemMade := <-preparationMachineFoodItems[f.PMFoodItem.Name][f.Name]
 				fmt.Printf("-- Order Thread --: Food item %s received back to the order thread\n", foodItemMade.Name)
 			}
 			fmt.Printf("-- Order Thread --: Order %s ready and being sent to ordersReady\n", o.Name)
@@ -334,15 +335,15 @@ func (x Simulate) initiatePreparationMachcinesIngredients(employeeList *Employee
 }
 
 func (x Simulate) initiatePreparationMachinesFoodItem(employeeList *EmployeeList, capacityControl map[string]([]chan bool), preparationMachinesFoodItems map[string](map[string](chan DatabaseModels.FoodItem)), preparationMachinesFoodItemsBuffer map[string]([]chan DatabaseModels.FoodItem), preparationMachinesIngredientsBuffer map[string][]chan DatabaseModels.Ingredient, preparationMachinesIngredients map[string](map[string](chan DatabaseModels.Ingredient))) {
-	var preparationMachinesFoodItemDB []DatabaseModels.PreparationMachineFoodItem
+	var preparationMachinesFoodItemDB []DatabaseModels.PMFoodItem
 
 	x.Db.Find(&preparationMachinesFoodItemDB)
 
-	for _, prepMachine := range preparationMachinesFoodItemDB {
-		createPreparationMachineFoodItemBuffer(prepMachine, preparationMachinesFoodItemsBuffer, capacityControl, preparationMachinesFoodItems)
+	for _, prepMachineFood := range preparationMachinesFoodItemDB {
+		createPMFoodItemBuffer(prepMachineFood, preparationMachinesFoodItemsBuffer, capacityControl, preparationMachinesFoodItems)
 
-		for i := 0; i < prepMachine.NumberOfMachines; i++ {
-			go runPreparationMachineFoodItem(prepMachine, capacityControl, preparationMachinesFoodItemsBuffer, preparationMachinesIngredientsBuffer, preparationMachinesIngredients, preparationMachinesFoodItems, i, employeeList)
+		for i := 0; i < prepMachineFood.NumberOfMachines; i++ {
+			go runPMFoodItem(prepMachineFood, capacityControl, preparationMachinesFoodItemsBuffer, preparationMachinesIngredientsBuffer, preparationMachinesIngredients, preparationMachinesFoodItems, i, employeeList)
 		}
 	}
 
@@ -369,7 +370,7 @@ func (x Simulate) initiateFoodItems(preparationMachinesFoodItems map[string](map
 
 	var foodItemsDB []DatabaseModels.FoodItem
 
-	x.Db.Preload("PreparationMachineFoodItem").Find(&foodItemsDB)
+	x.Db.Preload("PMFoodItem").Find(&foodItemsDB)
 
 	for _, foodItemDB := range foodItemsDB {
 		addFoodItemToPrepMachine(foodItemDB, preparationMachinesFoodItems)
@@ -377,7 +378,25 @@ func (x Simulate) initiateFoodItems(preparationMachinesFoodItems map[string](map
 
 }
 
+func printAllFoodItem(food DatabaseModels.FoodItem, toAdd string) {
+	toAddNext := toAdd + "---"
+
+	fmt.Printf("%s%s -> %s\n", toAdd, food.Name, food.PMFoodItem.Name)
+	for _, ing := range food.IngredientList {
+		fmt.Printf("%s%s -> %s\n", toAdd, ing.Name, ing.PreparationMachine.Name)
+	}
+
+	for _, food := range food.FoodItems {
+		printAllFoodItem(food, toAddNext)
+	}
+}
+
 func (x Simulate) AddOrderToQueue(order DatabaseModels.Order) {
+
+	fmt.Printf("Order %s\n", order.Name)
+	for _, f := range order.FoodItems {
+		printAllFoodItem(f, "---")
+	}
 
 	x.Orders <- order
 }
@@ -408,9 +427,11 @@ func (x Simulate) StartSimulation() {
 	ordersSent := make(chan DatabaseModels.Order, 20)
 
 	go func() {
+		ordersDoneCounter := 0
 		for {
 			orderReady := <-ordersReady
-			fmt.Printf("-- OrdersReady Thread --: Order %s is ready\n", orderReady.Name)
+			ordersDoneCounter = ordersDoneCounter + 1
+			fmt.Printf("-- OrdersReady Thread --: Order %s is ready, being the %d order\n", orderReady.Name, ordersDoneCounter)
 		}
 	}()
 
@@ -436,17 +457,17 @@ func (x Simulate) StartSimulation() {
 
 	//May use for test
 	// prepMachineBurgerAssemblyPoint := PreparationMachine{Name: "Burger Assembly Point", Capacity: 1, NumberOfMachines: 4} // We have 4 assembly points each with capacity 1
-	// createPreparationMachineFoodItemBuffer(prepMachineBurgerAssemblyPoint, preparationMachinesFoodItemsBuffer, capacityControl, preparationMachinesFoodItems)
+	// createPMFoodItemBuffer(prepMachineBurgerAssemblyPoint, preparationMachinesFoodItemsBuffer, capacityControl, preparationMachinesFoodItems)
 
 	// for i := 0; i < prepMachineBurgerAssemblyPoint.NumberOfMachines; i++ {
-	// 	go runPreparationMachineFoodItem(prepMachineBurgerAssemblyPoint, capacityControl, preparationMachinesFoodItemsBuffer, preparationMachinesIngredientsBuffer, preparationMachinesIngredients, preparationMachinesFoodItems, i, &employeeList)
+	// 	go runPMFoodItem(prepMachineBurgerAssemblyPoint, capacityControl, preparationMachinesFoodItemsBuffer, preparationMachinesIngredientsBuffer, preparationMachinesIngredients, preparationMachinesFoodItems, i, &employeeList)
 	// }
 
 	// prepMachineSanvisusMaker := PreparationMachine{Name: "SanvisusMaker", Capacity: 3, NumberOfMachines: 1}
-	// createPreparationMachineFoodItemBuffer(prepMachineSanvisusMaker, preparationMachinesFoodItemsBuffer, capacityControl, preparationMachinesFoodItems)
+	// createPMFoodItemBuffer(prepMachineSanvisusMaker, preparationMachinesFoodItemsBuffer, capacityControl, preparationMachinesFoodItems)
 
 	// for i := 0; i < prepMachineSanvisusMaker.NumberOfMachines; i++ {
-	// 	go runPreparationMachineFoodItem(prepMachineSanvisusMaker, capacityControl, preparationMachinesFoodItemsBuffer, preparationMachinesIngredientsBuffer, preparationMachinesIngredients, preparationMachinesFoodItems, i, &employeeList)
+	// 	go runPMFoodItem(prepMachineSanvisusMaker, capacityControl, preparationMachinesFoodItemsBuffer, preparationMachinesIngredientsBuffer, preparationMachinesIngredients, preparationMachinesFoodItems, i, &employeeList)
 	// }
 
 	x.initiateIngredients(preparationMachinesIngredients)

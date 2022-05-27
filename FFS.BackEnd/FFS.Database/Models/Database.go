@@ -19,14 +19,14 @@ func (x *Database) Run() {
 	//x.Db.AutoMigrate(&Album{}) // creating the migration for the album table
 
 	x.Db.AutoMigrate(&PreparationMachine{})
-	x.Db.AutoMigrate(&PreparationMachineFoodItem{})
+	x.Db.AutoMigrate(&PMFoodItem{})
 	x.Db.AutoMigrate(&Ingredient{})
 	x.Db.AutoMigrate(&FoodItem{})
 	x.Db.AutoMigrate(&Employee{})
 	x.Db.AutoMigrate(&Order{})
 
 	// x.Db.Unscoped().Where("1 = 1").Delete(&PreparationMachine{})
-	// x.Db.Unscoped().Where("1 = 1").Delete(&PreparationMachineFoodItem{})
+	// x.Db.Unscoped().Where("1 = 1").Delete(&PMFoodItem{})
 	// x.Db.Unscoped().Where("1 = 1").Delete(&Ingredient{})
 	// x.Db.Unscoped().Where("1 = 1").Delete(&FoodItem{})
 	// x.Db.Unscoped().Where("1 = 1").Delete(&Employee{})

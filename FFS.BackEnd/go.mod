@@ -4,11 +4,12 @@ go 1.15
 
 require (
 	BusinessLogicModels v1.0.0
-	BusinessLogicUtilities v1.0.0
-	DatabaseModels v1.0.0
-    Controllers v1.0.0
 	BusinessLogicServices v1.0.0
+	BusinessLogicUtilities v1.0.0
+	Controllers v1.0.0
+	DatabaseModels v1.0.0
 	github.com/gin-gonic/gin v1.7.7
+	github.com/lib/pq v1.10.6 // indirect
 	github.com/mattn/go-sqlite3 v1.14.11 // indirect
 	gorm.io/driver/sqlite v1.3.1
 	gorm.io/gorm v1.23.1

@@ -90,3 +90,84 @@ func (x SetupController) Run() {
 	x.Router.GET("/startSimulation", x.StartSimulation)
 
 }
+
+/*
+
+You have a list of N+1 integers between 1 and N.
+You know there's at least one duplicate, but there might be more.
+Print out a number that appears in the list more than once.
+
+For example:
+N=3        list: 3, 1, 1, 3 -> result 1 or 3
+N=5        list: 5 2 3 4 5 1 -> result 5
+
+
+  sumMax = 1+..+N + N
+
+  sumList = arr[0] + ... + arr[arr.size()-1]
+
+  sumMax < sumList
+
+  N/2 -> N
+
+  sumMaxLeft = N/2 + N/2+1 + ... + N
+
+  sumList = arr[0] + ... + arrr[N-1] // only if arr[i] >= N/2
+
+int getDuplicateRec(int arr[], sumMax, sumList, NMin, NMax){
+  int sumListLeft
+
+  for(int i = 0; i < N+1; i++){
+    if(arr[i] >= NMin && arr[i] <= Nmax)
+  }
+}
+
+
+int getDuplicate(int arr[]){
+
+  int sumMax = N*(N+1)/2 + N
+  int sumList = 0
+
+  for(int i = 0; i < N+1; i++){
+    sumList += arr[i]
+  }
+
+  if(sumMax < sumList){
+    int sumListLeft
+    int sumMaxLeft = sumMax - ((N\2-1)(N\2)/2)
+    for(int i = 0; i < N+1; i++)
+      if(arr[i] >= N/2)
+        sumListLeft += arr[i]
+  }
+}
+
+
+//without added memory
+int getDuplicate(int arr[]){
+  for(int i = 0; i < arr.size()-1; i++){
+    for(int j = i+1; j<arr.size(); j++){
+      if(arr[i] == arr[j])
+        return arr[i]
+    }
+  }
+
+  return -1
+}
+
+int getDuplicate(int arr[]){
+  arr.sort()
+
+	for(int i = 0; i < arr.size()-1; i++){
+    if(arr[i] == arr[i+1])
+      return arr[i]
+  }
+
+  return -1
+}
+
+
+
+
+
+
+*/

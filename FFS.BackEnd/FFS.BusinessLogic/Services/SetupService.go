@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	"gorm.io/gorm"
+
+	"github.com/lib/pq"
 )
 
 type SetupService struct {
@@ -20,7 +22,7 @@ func (x SetupService) AddPrepMachine(prepMachineDTO BusinessLogicModels.Preparat
 		prepMachine := DatabaseModels.PreparationMachine{Name: prepMachineDTO.Name, NumberOfMachines: prepMachineDTO.NumberOfMachines, Capacity: prepMachineDTO.Capacity}
 		x.Db.Create(&prepMachine)
 	} else {
-		prepMachine := DatabaseModels.PreparationMachineFoodItem{Name: prepMachineDTO.Name, NumberOfMachines: prepMachineDTO.NumberOfMachines, Capacity: prepMachineDTO.Capacity}
+		prepMachine := DatabaseModels.PMFoodItem{Name: prepMachineDTO.Name, NumberOfMachines: prepMachineDTO.NumberOfMachines, Capacity: prepMachineDTO.Capacity}
 		x.Db.Create(&prepMachine)
 	}
 
@@ -41,13 +43,21 @@ func (x SetupService) AddIngredient(ingredientDTO BusinessLogicModels.Ingredient
 
 	x.Db.Create(&ingredient)
 
-	fmt.Printf("Added ingredient with name %s and preparation machine %s with capacity %d \n", ingredient.Name, ingredient.PreparationMachine.Name, ingredient.PreparationMachine.Capacity)
+	var ingredientJustAdded DatabaseModels.Ingredient
+
+	x.Db.Preload("PreparationMachine").First(&ingredientJustAdded, "Name = ?", ingredientDTO.Name)
+
+	fmt.Printf("Added ingredient with name %s and preparation machine %s with capacity %d \n", ingredientJustAdded.Name, ingredientJustAdded.PreparationMachine.Name, ingredientJustAdded.PreparationMachine.Capacity)
 }
 
 func (x SetupService) AddFoodItem(foodItemDTO BusinessLogicModels.FoodItemDTO) {
-	var preparationMachineFoodItem DatabaseModels.PreparationMachineFoodItem
+
+	var preparationMachineFoodItem DatabaseModels.PMFoodItem
+
+	fmt.Printf("----------------------------------------------The preparation machine for the food item %s is: ", foodItemDTO.Name)
 
 	x.Db.First(&preparationMachineFoodItem, "Name = ?", foodItemDTO.PreparationMachineName)
+	fmt.Println(preparationMachineFoodItem.Name)
 
 	var ingredientList []DatabaseModels.Ingredient
 
@@ -57,14 +67,29 @@ func (x SetupService) AddFoodItem(foodItemDTO BusinessLogicModels.FoodItemDTO) {
 		fmt.Printf("Ingredient %s with prep machine %s and capacity %d \n", ingredient.Name, ingredient.PreparationMachine.Name, ingredient.PreparationMachine.Capacity)
 	}
 
-	var foodItemList []DatabaseModels.FoodItem
+	for _, foodItemString := range foodItemDTO.FoodItemNameList {
+		var foodItemFromDB DatabaseModels.FoodItem
 
-	x.Db.Preload("PreparationMachineFoodItem").Preload("IngredientList").Preload("FoodItems").Where("name in ?", foodItemDTO.FoodItemNameList).Find(&foodItemList)
+		x.Db.Preload("PMFoodItem").First(&foodItemFromDB, "Name = ?", foodItemString)
 
-	foodItem := DatabaseModels.FoodItem{Name: foodItemDTO.Name, IngredientList: ingredientList, PreparationMachineFoodItem: preparationMachineFoodItem, PreparationTime: foodItemDTO.PreparationTime, FoodItems: foodItemList}
+		fmt.Printf("FoodItem %s with preparation machine %s\n", foodItemFromDB.Name, foodItemFromDB.PMFoodItem.Name)
+	}
 
+	foodItem := DatabaseModels.FoodItem{Name: foodItemDTO.Name, IngredientList: ingredientList, PMFoodItem: preparationMachineFoodItem, PreparationTime: foodItemDTO.PreparationTime, FoodItemsString: pq.StringArray(foodItemDTO.FoodItemNameList)}
+
+	fmt.Printf("======================The food item %s with prep machine %s was created\n", foodItem.Name, foodItem.PMFoodItem.Name)
 	x.Db.Create(&foodItem)
 
+	var foodItemJustCreated DatabaseModels.FoodItem
+	//x.Db.Preload("PMFoodItem").Preload("FoodItemsString").First(&foodItemJustCreated, "Name = ?", foodItemDTO.Name)
+
+	x.Db.Preload("PMFoodItem").First(&foodItemJustCreated, "Name = ?", foodItemDTO.Name)
+
+	fmt.Printf("Added food item %s with prep machine %s and the food items: ", foodItemJustCreated.Name, foodItemJustCreated.PMFoodItem.Name)
+	for _, foodItemStingAddedNow := range foodItemJustCreated.FoodItemsString {
+		fmt.Printf("%s ", foodItemStingAddedNow)
+	}
+	fmt.Println()
 	//fmt.Printf("Added foodItem with name %s and ingredients: %s with prep machine %s and %s with prep machine %s \n", foodItem.Name, foodItem.IngredientList[0].Name, foodItem.IngredientList[0].PreparationMachine.Name, foodItem.IngredientList[1].Name, foodItem.IngredientList[1].PreparationMachine.Name)
 }
 
@@ -80,10 +105,26 @@ func (x SetupService) StartSimulation() {
 	go x.Simulate.StartSimulation()
 }
 
+func (x SetupService) getAllRecipe(foodItem *DatabaseModels.FoodItem) {
+	for i := range foodItem.FoodItemsString {
+		var foodItemNew DatabaseModels.FoodItem
+		x.Db.Preload("PMFoodItem").Preload("IngredientList").Preload("IngredientList.PreparationMachine").First(&foodItemNew, "Name = ?", foodItem.FoodItemsString[i])
+		x.getAllRecipe(&foodItemNew)
+
+		foodItem.FoodItems = append(foodItem.FoodItems, foodItemNew)
+	}
+}
+
 func (x SetupService) AddOrder(orderDTO BusinessLogicModels.OrderDTO) {
 	var foodItemList []DatabaseModels.FoodItem
 
-	x.Db.Preload("PreparationMachineFoodItem").Preload("IngredientList").Preload("IngredientList.PreparationMachine").Preload("FoodItems").Where("name in ?", orderDTO.FoodItemsName).Find(&foodItemList)
+	x.Db.Preload("PMFoodItem").Preload("IngredientList").Preload("IngredientList.PreparationMachine").Where("name in ?", orderDTO.FoodItemsName).Find(&foodItemList)
+
+	//x.Db.Preload("PMFoodItem").Preload("IngredientList").Preload("IngredientList.PreparrationMachine").Preload("FoodItems").Preload("FoodItems.PMFoodItems").Find(&foodItemsDB)
+
+	for i := range foodItemList {
+		x.getAllRecipe(&foodItemList[i])
+	}
 
 	order := DatabaseModels.Order{Name: orderDTO.Name, FoodItems: foodItemList}
 
